@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Editor de E-mail com Variáveis</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/js/all.min.js"></script>
+    <style>
+        /* Estilos para a área editável */
+        .editor-area {
+            min-height: 400px;
+            outline: none;
+        }
+        /* Placeholder visual quando vazio */
+        .editor-area:empty:before {
+            content: attr(placeholder);
+            color: #9ca3af;
+            font-style: italic;
+        }
+        /* Estilos do Preview */
+        .email-preview-bg {
+            background-color: #f3f4f6;
+            background-image: radial-gradient(#e5e7eb 1px, transparent 1px);
+            background-size: 20px 20px;
+        }
+        /* Reset básico para o conteúdo editável */
+        #editor-content ul { list-style-type: disc; margin-left: 20px; }
+        #editor-content ol { list-style-type: decimal; margin-left: 20px; }
+        #editor-content p { margin-bottom: 0.5em; }
+        
+        /* Destaque para as variáveis no editor */
+        .variable-tag {
+            background-color: #e0e7ff;
+            color: #4338ca;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 0.9em;
+            pointer-events: none;
+        }
+
+        /* Estilos do Seletor de Emoji */
+        .emoji-picker {
+            display: none;
+            position: absolute;
+            top: 100%;
+            left: 0;
+            background: white;
+            border: 1px solid #e5e7eb;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            padding: 0.5rem;
+            border-radius: 0.5rem;
+            width: 280px;
+            z-index: 50;
+            flex-wrap: wrap;
+            gap: 0.25rem;
+        }
+        .emoji-picker.active {
+            display: flex;
+        }
+        .emoji-btn {
+            font-size: 1.25rem;
+            padding: 0.25rem;
+            border-radius: 0.25rem;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        .emoji-btn:hover {
+            background-color: #f3f4f6;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 text-gray-800 h-screen flex flex-col overflow-hidden font-sans">
+
+    <!-- Header -->
+    <header class="bg-white border-b border-gray-200 p-4 flex justify-between items-center shadow-sm z-20">
+        <div class="flex items-center gap-3">
+            <div class="bg-blue-600 text-white p-2 rounded-lg">
+                <i class="fas fa-envelope-open-text"></i>
+            </div>
+            <div>
+                <h1 class="text-xl font-bold text-gray-800">Editor de Templates de E-mail</h1>
+                <p class="text-xs text-gray-500">Gera código HTML com Emojis em formato Unicode Seguro</p>
+            </div>
+        </div>
+        <button onclick="copyToClipboard()" class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg shadow transition flex items-center gap-2 font-medium">
+            <i class="fas fa-code"></i>
+            Copiar Código HTML
+        </button>
+    </header>
+
+    <!-- Main Content -->
+    <main class="flex-1 flex overflow-hidden">
+        
+        <!-- Left Column: Rich Editor -->
+        <div class="w-1/2 flex flex-col border-r border-gray-200 bg-white z-10">
+            
+            <!-- Variables Bar -->
+            <div class="bg-gray-50 p-3 border-b border-gray-200">
+                <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Inserir Marcadores (Variáveis)</p>
+                <div class="flex gap-2 flex-wrap">
+                    <!-- Botões com preventDefault para manter foco -->
+                    <button onmousedown="event.preventDefault(); insertVariable('[nome]')" class="text-sm bg-white border border-gray-300 hover:border-blue-400 text-gray-700 hover:text-blue-600 px-3 py-1.5 rounded-md shadow-sm transition flex items-center gap-2 group">
+                        <i class="fas fa-user text-gray-400 group-hover:text-blue-500"></i> [nome]
+                    </button>
+                    <button onmousedown="event.preventDefault(); insertVariable('[empresa]')" class="text-sm bg-white border border-gray-300 hover:border-blue-400 text-gray-700 hover:text-blue-600 px-3 py-1.5 rounded-md shadow-sm transition flex items-center gap-2 group">
+                        <i class="fas fa-building text-gray-400 group-hover:text-blue-500"></i> [empresa]
+                    </button>
+                    <button onmousedown="event.preventDefault(); insertVariable('[remetente]')" class="text-sm bg-white border border-gray-300 hover:border-blue-400 text-gray-700 hover:text-blue-600 px-3 py-1.5 rounded-md shadow-sm transition flex items-center gap-2 group">
+                        <i class="fas fa-signature text-gray-400 group-hover:text-blue-500"></i> [remetente]
+                    </button>
+                </div>
+            </div>
+
+            <!-- Toolbar -->
+            <div class="p-2 border-b border-gray-200 flex items-center gap-1 flex-wrap bg-white sticky top-0 relative">
+                <select id="formatBlock" onchange="execCmd('formatBlock', this.value); this.value=''" class="h-9 border border-gray-300 rounded px-2 text-sm text-gray-700 focus:outline-none focus:border-blue-500 mr-2">
+                    <option value="" selected disabled>Texto Normal</option>
+                    <option value="P">Parágrafo</option>
+                    <option value="H2">Título Principal (H2)</option>
+                    <option value="H3">Subtítulo (H3)</option>
+                </select>
+
+                <div class="h-6 w-px bg-gray-300 mx-1"></div>
+
+                <button onmousedown="event.preventDefault(); execCmd('bold')" title="Negrito (Ctrl+B)" class="p-2 rounded hover:bg-gray-100 text-gray-600 w-9 h-9 flex items-center justify-center">
+                    <i class="fas fa-bold"></i>
+                </button>
+                <button onmousedown="event.preventDefault(); execCmd('italic')" title="Itálico (Ctrl+I)" class="p-2 rounded hover:bg-gray-100 text-gray-600 w-9 h-9 flex items-center justify-center">
+                    <i class="fas fa-italic"></i>
+                </button>
+                <button onmousedown="event.preventDefault(); execCmd('underline')" title="Sublinhado (Ctrl+U)" class="p-2 rounded hover:bg-gray-100 text-gray-600 w-9 h-9 flex items-center justify-center">
+                    <i class="fas fa-underline"></i>
+                </button>
+
+                <div class="h-6 w-px bg-gray-300 mx-1"></div>
+
+                <button onmousedown="event.preventDefault(); execCmd('insertUnorderedList')" title="Lista com Marcadores" class="p-2 rounded hover:bg-gray-100 text-gray-600 w-9 h-9 flex items-center justify-center">
+                    <i class="fas fa-list-ul"></i>
+                </button>
+                <button onmousedown="event.preventDefault(); execCmd('insertOrderedList')" title="Lista Numerada" class="p-2 rounded hover:bg-gray-100 text-gray-600 w-9 h-9 flex items-center justify-center">
+                    <i class="fas fa-list-ol"></i>
+                </button>
+                
+                <div class="h-6 w-px bg-gray-300 mx-1"></div>
+
+                <!-- Botão de Emoji -->
+                <div class="relative">
+                    <button id="btn-emoji" onmousedown="event.preventDefault(); toggleEmojiPicker()" title="Inserir Emoji" class="p-2 rounded hover:bg-yellow-50 text-yellow-600 w-9 h-9 flex items-center justify-center">
+                        <i class="far fa-smile"></i>
+                    </button>
+                    <!-- Emoji Picker Dropdown -->
+                    <div id="emoji-picker" class="emoji-picker">
+                        <!-- Emojis populated by JS -->
+                    </div>
+                </div>
+
+                <button onclick="promptLink()" title="Inserir Link" class="p-2 rounded hover:bg-gray-100 text-gray-600 w-9 h-9 flex items-center justify-center">
+                    <i class="fas fa-link"></i>
+                </button>
+                
+                <!-- Botão CTA -->
+                <button onclick="promptButton()" title="Inserir Botão CTA" class="p-2 rounded hover:bg-blue-50 text-blue-600 w-9 h-9 flex items-center justify-center font-bold">
+                    <i class="fas fa-bullhorn"></i>
+                </button>
+
+                <button onmousedown="event.preventDefault(); execCmd('removeFormat')" title="Limpar Formatação" class="p-2 rounded hover:bg-gray-100 text-gray-600 w-9 h-9 flex items-center justify-center ml-auto">
+                    <i class="fas fa-eraser"></i>
+                </button>
+            </div>
+
+            <!-- Editor Area -->
+            <div class="flex-1 overflow-y-auto p-6 bg-white cursor-text" onclick="focusEditor()">
+                <div id="editor-content" 
+                     class="editor-area text-lg leading-relaxed text-gray-800" 
+                     contenteditable="true" 
+                     placeholder="Comece a digitar seu e-mail aqui..."
+                     oninput="updatePreview()">
+                    <p>Olá, <strong> pessoa!</strong> Tudo certo?</p>
+                    <p><br></p>
+                    <p>Que bom ver você por aqui🤗 </p>
+  		    <p><br></p>
+                    <p>Utilize essa ferramenta para gerar o seu <strong>código em HTML/CSS</strong>.</p>
+                    <p><br></p>
+                    <p>Adicione seu texto, sua formatação e copie o código fonte exibido na janela ao lado, depois é só colar no código criado na sua planilha.</p>
+                    <p><br></p>
+		    <p><strong>E não esqueça de mandar 🪙 pro Gael, hein 😂</strong></p>
+                    <!-- Exemplo de botão já inserido para demonstração -->
+                    <div style="text-align: center; margin: 20px 0;">
+                        <a href="https://meet.google.com" style="display: inline-block; padding: 12px 25px; color: #ffffff; background-color: #1A73E8; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 16px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">Clique no Megafone para incluir um botão personalizado</a>
+                    </div>
+                    <p><br></p>
+                    <p>Atenciosamente,</p>
+                    <p><em>[remetente]</em></p>
+
+                </div>
+            </div>
+            
+            <div class="bg-gray-50 border-t border-gray-200 p-2 text-xs text-gray-500 text-center">
+                Dica: Use <strong>Ctrl+B</strong> para negrito, <strong>Ctrl+I</strong> para itálico.
+            </div>
+        </div>
+
+        <!-- Right Column: Preview & Source -->
+        <div class="w-1/2 flex flex-col bg-gray-50">
+            <!-- Tabs -->
+            <div class="flex border-b border-gray-200 bg-white">
+                <button onclick="switchTab('preview')" id="tab-preview" class="flex-1 py-3 text-center font-medium text-blue-600 border-b-2 border-blue-600 bg-blue-50 transition-colors">
+                    <i class="fas fa-eye mr-2"></i> Visualização
+                </button>
+                <button onclick="switchTab('code')" id="tab-code" class="flex-1 py-3 text-center font-medium text-gray-500 hover:text-gray-700 transition-colors">
+                    <i class="fas fa-code mr-2"></i> Código Fonte
+                </button>
+            </div>
+
+            <!-- Preview Area -->
+            <div id="view-preview" class="flex-1 email-preview-bg p-8 overflow-y-auto flex justify-center items-start">
+                <div id="preview-frame" class="w-full bg-white shadow-xl transition-all duration-300">
+                    <!-- Rendered HTML will appear here -->
+                </div>
+            </div>
+
+            <!-- Code Area -->
+            <div id="view-code" class="hidden flex-1 bg-gray-900 text-gray-100 p-0 overflow-hidden flex flex-col">
+                <div class="flex-1 overflow-auto p-4">
+                    <pre><code id="code-output" class="language-html font-mono text-sm whitespace-pre-wrap break-all"></code></pre>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="fixed bottom-6 right-6 bg-gray-800 text-white px-6 py-4 rounded-lg shadow-2xl transform translate-y-32 transition-transform duration-300 flex items-center gap-3 z-50">
+        <i class="fas fa-check-circle text-green-400 text-xl"></i>
+        <div>
+            <h4 class="font-bold text-sm">Copiado!</h4>
+            <p class="text-xs text-gray-300">O HTML está na sua área de transferência.</p>
+        </div>
+    </div>
+
+    <script>
+        // --- Emoji List ---
+        const POPULAR_EMOJIS = [
+            '😂', '💰', '👋', '🤝', '👍', '👏', '🚀', 
+            '📅', '✅', '❗', '🎉', '✨',
+            '💼', '📧', '📞', '💡', '🔥',
+            '📢', '🎯', '📍', '⭐', '💬',
+            '😊', '🙏', '👀', '📊', '🌐'
+        ];
+
+        // --- Selection Saving Logic (ROBUST) ---
+        let savedRange = null;
+
+        // Ouvinte global para qualquer mudança de seleção (teclado, mouse, setas)
+        document.addEventListener('selectionchange', () => {
+            const editor = document.getElementById('editor-content');
+            const sel = window.getSelection();
+            
+            // Se houver uma seleção válida
+            if (sel.rangeCount > 0) {
+                const range = sel.getRangeAt(0);
+                // Verifica se a seleção está DENTRO do nosso editor
+                if (editor.contains(range.commonAncestorContainer)) {
+                    savedRange = range.cloneRange();
+                }
+            }
+        });
+
+        function restoreSelection() {
+            const editor = document.getElementById('editor-content');
+            editor.focus();
+            
+            if (savedRange) {
+                const sel = window.getSelection();
+                sel.removeAllRanges();
+                sel.addRange(savedRange);
+            }
+        }
+
+        // --- Core Logic ---
+
+        function execCmd(command, value = null) {
+            document.execCommand(command, false, value);
+            focusEditor();
+            updatePreview();
+            // savedRange é atualizado automaticamente pelo 'selectionchange'
+        }
+
+        // Emoji Logic
+        function toggleEmojiPicker() {
+            const picker = document.getElementById('emoji-picker');
+            
+            // Populate if empty
+            if (picker.children.length === 0) {
+                POPULAR_EMOJIS.forEach(emoji => {
+                    const btn = document.createElement('div');
+                    btn.className = 'emoji-btn';
+                    btn.textContent = emoji;
+                    // Mousedown previne que o clique no emoji roube o foco
+                    btn.onmousedown = (e) => {
+                        e.preventDefault(); 
+                        insertEmoji(emoji);
+                    };
+                    picker.appendChild(btn);
+                });
+            }
+            
+            picker.classList.toggle('active');
+        }
+
+        function insertEmoji(emoji) {
+            // Restaura a posição exata
+            restoreSelection();
+            
+            document.execCommand('insertText', false, emoji);
+            
+            document.getElementById('emoji-picker').classList.remove('active');
+            updatePreview();
+        }
+
+        // Close emoji picker when clicking outside
+        document.addEventListener('click', function(event) {
+            const picker = document.getElementById('emoji-picker');
+            const toggleBtn = document.getElementById('btn-emoji');
+            
+            if (!picker.contains(event.target) && !toggleBtn.contains(event.target) && picker.classList.contains('active')) {
+                picker.classList.remove('active');
+            }
+        });
+
+        function promptLink() {
+            const url = prompt('Digite a URL do link:', 'https://');
+            if (url) {
+                restoreSelection(); 
+                execCmd('createLink', url);
+            }
+        }
+
+        function promptButton() {
+            const text = prompt('Texto do Botão:', 'Acessar o Encontro');
+            if (!text) return;
+            
+            const url = prompt('Link de destino (URL):', 'https://');
+            if (!url) return;
+
+            const buttonHtml = `
+            <div style="text-align: center; margin: 20px 0;">
+                <a href="${url}" style="
+                    display: inline-block;
+                    padding: 12px 25px;
+                    color: #ffffff;
+                    background-color: #1A73E8;
+                    text-decoration: none;
+                    border-radius: 6px;
+                    font-weight: bold;
+                    font-size: 16px;
+                    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+                ">${text}</a>
+            </div><br>`;
+            
+            restoreSelection();
+            execCmd('insertHTML', buttonHtml);
+        }
+
+        function insertVariable(variableName) {
+            restoreSelection();
+            document.execCommand('insertText', false, variableName);
+            updatePreview();
+        }
+
+        function focusEditor() {
+            const editor = document.getElementById('editor-content');
+            if (document.activeElement !== editor && !editor.contains(document.activeElement)) {
+                editor.focus();
+            }
+        }
+
+        // --- Utility: Convert String with Emojis to HTML Entities ---
+        function encodeToUnicodeEntities(str) {
+            return Array.from(str).map(char => {
+                const code = char.codePointAt(0);
+                return code > 127 ? '&#' + code + ';' : char;
+            }).join('');
+        }
+
+        // --- Template Generator ---
+
+        function getFullHTML() {
+            const rawContent = document.getElementById('editor-content').innerHTML;
+            const encodedContent = encodeToUnicodeEntities(rawContent);
+
+            return `<html>
+  <body style="font-family: Arial, sans-serif; color: #333; line-height: 1.6; margin: 0; padding: 0;">
+    <div style="max-width: 600px; margin: auto; padding: 20px; border: 1px solid #ddd; border-radius: 8px; background-color: #ffffff;">
+      <!-- Conteúdo do E-mail -->
+      ${encodedContent}
+      <!-- Fim do Conteúdo -->
+    </div>
+  </body>
+</html>`;
+        }
+
+        function updatePreview() {
+            const fullHtml = getFullHTML();
+            const content = document.getElementById('editor-content').innerHTML;
+            const previewContainer = document.getElementById('preview-frame');
+            
+            previewContainer.innerHTML = `
+                <div style="max-width: 600px; margin: auto; padding: 20px; border: 1px solid #ddd; border-radius: 8px; background-color: #ffffff; font-family: Arial, sans-serif; color: #333; line-height: 1.6;">
+                    ${content}
+                </div>
+            `;
+
+            document.getElementById('code-output').textContent = fullHtml;
+        }
+
+        // --- UI Interactions ---
+
+        function switchTab(tab) {
+            const previewView = document.getElementById('view-preview');
+            const codeView = document.getElementById('view-code');
+            const tabPreview = document.getElementById('tab-preview');
+            const tabCode = document.getElementById('tab-code');
+
+            if (tab === 'preview') {
+                previewView.classList.remove('hidden');
+                codeView.classList.add('hidden');
+                
+                tabPreview.classList.add('text-blue-600', 'border-b-2', 'border-blue-600', 'bg-blue-50');
+                tabPreview.classList.remove('text-gray-500');
+                
+                tabCode.classList.remove('text-blue-600', 'border-b-2', 'border-blue-600', 'bg-blue-50');
+                tabCode.classList.add('text-gray-500');
+            } else {
+                updatePreview(); 
+                previewView.classList.add('hidden');
+                codeView.classList.remove('hidden');
+                
+                tabCode.classList.add('text-blue-600', 'border-b-2', 'border-blue-600', 'bg-blue-50');
+                tabCode.classList.remove('text-gray-500');
+
+                tabPreview.classList.remove('text-blue-600', 'border-b-2', 'border-blue-600', 'bg-blue-50');
+                tabPreview.classList.add('text-gray-500');
+            }
+        }
+
+        function copyToClipboard() {
+            const html = getFullHTML();
+            
+            const el = document.createElement('textarea');
+            el.value = html;
+            document.body.appendChild(el);
+            el.select();
+            document.execCommand('copy');
+            document.body.removeChild(el);
+
+            const toast = document.getElementById('toast');
+            toast.classList.remove('translate-y-32');
+            setTimeout(() => {
+                toast.classList.add('translate-y-32');
+            }, 3000);
+        }
+
+        window.onload = () => {
+            updatePreview();
+        };
+    </script>
+</body>
+</html>
