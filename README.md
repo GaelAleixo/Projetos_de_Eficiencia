@@ -44,7 +44,7 @@ O projeto foi construído utilizando tecnologias modernas e leves:
 
 ## 💡 Como Usar
 
-1.  **Escreva seu e-mail:** Use a área de edição principal para digitar o conteúdo.
+1.  **Escreva seu texto de e-mail:** Use a área de edição principal para digitar o conteúdo.
 2.  **Personalize:** Utilize a barra de ferramentas para formatar texto, adicionar listas ou inserir botões.
 3.  **Adicione Variáveis:** Clique nos botões laterais (ex: `[Nome da conta]`) para inserir placeholders que serão substituídos pela sua ferramenta de disparo de e-mail.
 4.  **Exporte:** Clique na aba **"Código Fonte"** para ver o HTML ou clique no botão **"Copiar Código HTML"** no topo para levar o código pronto para sua plataforma de envio.
