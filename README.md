@@ -60,7 +60,7 @@ Desenvolvido por Gael Aleixo.
 [![LinkedIn](https://img.shields.io/badge/LinkedIn-0077B5?style=for-the-badge&logo=linkedin&logoColor=white)](https://www.linkedin.com/in/gael-aleixo-4946841a4/)
 [![GitHub](https://img.shields.io/badge/GitHub-100000?style=for-the-badge&logo=github&logoColor=white)](https://github.com/GaelAleixo)
 
-Copyright © 2024 - Todos os direitos reservados.
+Copyright © 2025 - Todos os direitos reservados.
 
 ---
 
