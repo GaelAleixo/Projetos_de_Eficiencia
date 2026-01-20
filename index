@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Editor de Templates - Automação Gupy</title>
+    <!-- Tailwind CSS para estilização rápida e moderna -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome para ícones -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/js/all.min.js"></script>
+    <style>
+        /* Estilos personalizados para o editor */
+        .editor-container {
+            height: calc(100vh - 180px);
+        }
+        .editor-content {
+            outline: none;
+            overflow-y: auto;
+        }
+        
+        /* CORREÇÃO IMPORTANTE: Restaurar estilo de listas que o Tailwind reseta */
+        .editor-content ul {
+            list-style-type: disc;
+            margin-left: 1.5em;
+            margin-bottom: 1em;
+        }
+        .editor-content ol {
+            list-style-type: decimal;
+            margin-left: 1.5em;
+            margin-bottom: 1em;
+        }
+        .editor-content li {
+            margin-bottom: 0.25em;
+        }
+
+        /* Placeholder visual */
+        .editor-content:empty:before {
+            content: attr(placeholder);
+            color: #9ca3af;
+            font-style: italic;
+        }
+        /* Variáveis no editor visual */
+        .variable-chip {
+            background-color: #eff6ff;
+            color: #1d4ed8;
+            border: 1px solid #bfdbfe;
+            border-radius: 4px;
+            padding: 2px 6px;
+            font-family: monospace;
+            font-size: 0.9em;
+            user-select: all;
+            display: inline-block;
+            margin: 0 2px;
+        }
+        /* Área de código */
+        .code-area {
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 13px;
+            line-height: 1.5;
+            background-color: #1e293b;
+            color: #e2e8f0;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 h-screen flex flex-col font-sans text-gray-800">
+
+    <!-- Cabeçalho -->
+    <header class="bg-white shadow-sm z-10 p-4 border-b border-gray-200">
+        <div class="max-w-7xl mx-auto flex justify-between items-center">
+            <div class="flex items-center gap-3">
+                <div class="bg-blue-600 text-white p-2 rounded-lg shadow">
+                    <i class="fas fa-magic"></i>
+                </div>
+                <div>
+                    <h1 class="text-xl font-bold text-gray-800">Criador de Templates HTML</h1>
+                    <p class="text-xs text-gray-500">Para aba "Plano de Ação"</p>
+                </div>
+            </div>
+            
+            <div class="flex gap-2">
+                <button onclick="copiarCodigo()" class="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-lg shadow transition font-medium flex items-center gap-2">
+                    <i class="fas fa-copy"></i> Copiar HTML para Planilha
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Toolbar de Formatação e Variáveis -->
+    <div class="bg-white border-b border-gray-200 px-4 py-3 shadow-sm">
+        <div class="max-w-7xl mx-auto flex flex-wrap gap-4 items-center">
+            
+            <!-- Grupo: Formatação Texto -->
+            <div class="flex bg-gray-50 rounded-lg border border-gray-200 p-1 gap-1">
+                <!-- Nota: onmousedown="event.preventDefault()" previne que o botão roube o foco do editor -->
+                <button onmousedown="event.preventDefault(); execCmd('bold')" title="Negrito" class="w-8 h-8 rounded hover:bg-white hover:shadow-sm text-gray-600 transition"><i class="fas fa-bold"></i></button>
+                <button onmousedown="event.preventDefault(); execCmd('italic')" title="Itálico" class="w-8 h-8 rounded hover:bg-white hover:shadow-sm text-gray-600 transition"><i class="fas fa-italic"></i></button>
+                <button onmousedown="event.preventDefault(); execCmd('underline')" title="Sublinhado" class="w-8 h-8 rounded hover:bg-white hover:shadow-sm text-gray-600 transition"><i class="fas fa-underline"></i></button>
+                
+                <div class="w-px bg-gray-300 mx-1"></div>
+                
+                <button onmousedown="event.preventDefault(); execCmd('insertUnorderedList')" title="Lista com Marcadores" class="w-8 h-8 rounded hover:bg-white hover:shadow-sm text-gray-600 transition"><i class="fas fa-list-ul"></i></button>
+                <button onmousedown="event.preventDefault(); execCmd('insertOrderedList')" title="Lista Numerada" class="w-8 h-8 rounded hover:bg-white hover:shadow-sm text-gray-600 transition"><i class="fas fa-list-ol"></i></button>
+                
+                <div class="w-px bg-gray-300 mx-1"></div>
+
+                <button onmousedown="event.preventDefault(); promptLink()" title="Inserir Link" class="w-8 h-8 rounded hover:bg-white hover:shadow-sm text-blue-600 transition"><i class="fas fa-link"></i></button>
+                <button onmousedown="event.preventDefault(); execCmd('unlink')" title="Remover Link" class="w-8 h-8 rounded hover:bg-white hover:shadow-sm text-gray-500 transition"><i class="fas fa-unlink"></i></button>
+                
+                <div class="w-px bg-gray-300 mx-1"></div>
+
+                <button onmousedown="event.preventDefault(); execCmd('removeFormat')" title="Limpar Formatação" class="w-8 h-8 rounded hover:bg-white hover:shadow-sm text-red-500 transition"><i class="fas fa-eraser"></i></button>
+            </div>
+
+            <!-- Grupo: Variáveis Dinâmicas (Essenciais para o Script) -->
+            <div class="flex items-center gap-2 flex-wrap">
+                <span class="text-xs font-bold text-gray-400 uppercase tracking-wider">Variáveis:</span>
+                
+                <button onmousedown="event.preventDefault(); inserirVariavel('{{Nome da empresa}}')" class="text-xs bg-blue-50 border border-blue-200 text-blue-700 hover:bg-blue-100 px-3 py-1.5 rounded transition font-medium">
+                    🏢 Empresa
+                </button>
+
+                <button onmousedown="event.preventDefault(); inserirVariavel('{{Subdominio}}')" class="text-xs bg-indigo-50 border border-indigo-200 text-indigo-700 hover:bg-indigo-100 px-3 py-1.5 rounded transition font-medium">
+                    🌐 Subdomínio
+                </button>
+                
+                <button onmousedown="event.preventDefault(); inserirVariavel('{{CSM}}')" class="text-xs bg-purple-50 border border-purple-200 text-purple-700 hover:bg-purple-100 px-3 py-1.5 rounded transition font-medium">
+                    👤 CSM
+                </button>
+
+                <button onmousedown="event.preventDefault(); inserirVariavel('{{% Vagas 90d}}')" class="text-xs bg-yellow-50 border border-yellow-200 text-yellow-700 hover:bg-yellow-100 px-3 py-1.5 rounded transition font-medium">
+                    📊 Vagas 90d
+                </button>
+
+                <button onmousedown="event.preventDefault(); inserirVariavel('{{% Feedback}}')" class="text-xs bg-green-50 border border-green-200 text-green-700 hover:bg-green-100 px-3 py-1.5 rounded transition font-medium">
+                    💬 Feedback
+                </button>
+
+                <button onmousedown="event.preventDefault(); inserirVariavel('{{Vagas_Criticas}}')" class="text-xs bg-red-50 border border-red-200 text-red-700 hover:bg-red-100 px-3 py-1.5 rounded transition font-bold border-dashed border-2">
+                    ⚠️ Tabela Vagas Críticas
+                </button>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- Área Principal -->
+    <main class="flex-1 max-w-7xl mx-auto w-full p-4 gap-6 flex editor-container">
+        
+        <!-- Lado Esquerdo: Editor Visual -->
+        <div class="w-1/2 bg-white rounded-xl shadow-lg border border-gray-200 flex flex-col overflow-hidden">
+            <div class="bg-gray-50 px-4 py-2 border-b border-gray-200 text-xs font-bold text-gray-500 uppercase">
+                Editor Visual (Escreva aqui)
+            </div>
+            <div id="editor" class="editor-content flex-1 p-6 text-lg leading-relaxed" 
+                 contenteditable="true" 
+                 placeholder="Comece seu e-mail aqui. Use os botões acima para inserir dados variáveis...">
+                 <p>Olá, tudo bem?</p>
+                 <p>Estamos analisando os dados da empresa <strong>{{Nome da empresa}}</strong> (<em>{{Subdominio}}</em>) e notamos algo importante.</p>
+                 <ul>
+                    <li>Atualmente vocês têm <strong>{{% Vagas 90d}}%</strong> de vagas antigas.</li>
+                    <li>O feedback está em <strong>{{% Feedback}}%</strong>.</li>
+                 </ul>
+                 <p><br></p>
+                 <p>{{Vagas_Criticas}}</p>
+                 <p><br></p>
+                 <p>Abraços,<br><strong>{{CSM}}</strong></p>
+            </div>
+        </div>
+
+        <!-- Lado Direito: Preview do HTML -->
+        <div class="w-1/2 bg-slate-800 rounded-xl shadow-lg border border-slate-700 flex flex-col overflow-hidden">
+            <div class="bg-slate-900 px-4 py-2 border-b border-slate-700 text-xs font-bold text-gray-400 uppercase flex justify-between">
+                <span>Código HTML (Automático)</span>
+                <span class="text-green-400 text-[10px]"><i class="fas fa-circle"></i> Live Update</span>
+            </div>
+            <textarea id="output-html" class="flex-1 p-4 code-area w-full h-full resize-none outline-none" readonly></textarea>
+        </div>
+
+    </main>
+
+    <!-- Notificação Toast -->
+    <div id="toast" class="fixed bottom-10 right-10 bg-gray-900 text-white px-6 py-4 rounded shadow-2xl transform translate-y-32 transition duration-300 flex items-center gap-3 z-50">
+        <i class="fas fa-check-circle text-green-400 text-xl"></i>
+        <div>
+            <h4 class="font-bold">Copiado!</h4>
+            <p class="text-xs text-gray-300">Cole na Célula (Linha 4) da aba Plano de Ação.</p>
+        </div>
+    </div>
+
+    <script>
+        // --- Lógica Principal ---
+
+        const editor = document.getElementById('editor');
+        const output = document.getElementById('output-html');
+
+        // Atualiza o HTML em tempo real sempre que houver input
+        editor.addEventListener('input', atualizarHTML);
+        
+        // Comandos de edição básicos
+        function execCmd(command, value = null) {
+            document.execCommand(command, false, value);
+            editor.focus();
+            atualizarHTML();
+        }
+
+        function promptLink() {
+            // Salva a seleção atual antes de abrir o prompt
+            // Embora o focus() no execCmd geralmente resolva, em alguns navegadores o prompt quebra a seleção
+            const link = prompt('Insira a URL do link:', 'https://');
+            if(link) {
+                execCmd('createLink', link);
+            } else {
+                editor.focus(); // Retorna o foco se cancelar
+            }
+        }
+
+        // Insere a variável onde o cursor está
+        function inserirVariavel(texto) {
+            editor.focus();
+            document.execCommand('insertText', false, texto);
+            atualizarHTML();
+        }
+
+        // Gera o HTML final limpo e pronto para o Google Sheets
+        function atualizarHTML() {
+            let html = editor.innerHTML;
+            
+            // Remove classes indesejadas (se houver copy-paste de outros lugares)
+            html = html.replace(/ class=".*?"/g, '');
+            
+            // Encode apenas de Emojis e caracteres especiais, preservando Tags HTML
+            html = encodeEmojis(html);
+
+            output.value = html;
+        }
+
+        function encodeEmojis(str) {
+            // Regex ajustada: Seleciona apenas caracteres fora do padrão ASCII (0-127).
+            // Isso preserva <, >, ", =, etc., mas captura emojis (😊) e acentos (ç, ã).
+            return str.replace(/[^\x00-\x7F]/g, function(i) {
+                return '&#'+i.charCodeAt(0)+';';
+            });
+        }
+        
+        // Copiar para clipboard
+        function copiarCodigo() {
+            output.select();
+            document.execCommand('copy');
+            
+            // Mostra Toast
+            const toast = document.getElementById('toast');
+            toast.classList.remove('translate-y-32');
+            setTimeout(() => toast.classList.add('translate-y-32'), 3000);
+        }
+
+        // Inicializa na carga da página
+        atualizarHTML();
+    </script>
+</body>
+</html>
